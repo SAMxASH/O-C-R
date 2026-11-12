@@ -1,12 +1,37 @@
+# ------------------------------------------------------------------ core web / server
 flask
 python-dotenv
-pymupdf
-numpy
 requests
-pillow
-sentence-transformers
-# --- local OCR engines: install at least one (all optional) ---
-pytesseract            # also install the Tesseract program itself (Windows: UB-Mannheim build)
-rapidocr-onnxruntime   # fastest on CPU, no GPU needed
-# paddleocr paddlepaddle   # heavier; best with a GPU
-python-docx            # Word (.docx) export
+
+# ------------------------------------------------------------------ PDF rendering & layout
+pymupdf                 # fitz — page render + text layer extraction (code imports pymupdf as fitz)
+pillow                  # page image handling, crop, PDF-from-image
+numpy                   # gutter detection, embedding math
+
+# ------------------------------------------------------------------ hybrid search (semantic + keyword)
+sentence-transformers   # BAAI/bge-small-en-v1.5 embeddings
+# (brings in torch, transformers, tokenizers, huggingface-hub — download size is large;
+#  if you already have a torch build matched to your CUDA/driver, install torch FIRST
+#  so sentence-transformers doesn't pull a different one)
+
+# ------------------------------------------------------------------ local OCR engines (pick what you have)
+pytesseract             # ALSO install the Tesseract program itself:
+                        #   Windows: https://github.com/UB-Mannheim/tesseract/wiki
+                        #   macOS:   brew install tesseract
+                        #   Linux:   sudo apt install tesseract-ocr
+rapidocr-onnxruntime    # fastest CPU engine, no GPU needed — recommended for 1945+ scans
+# paddleocr
+# paddlepaddle          # heavier; GPU strongly recommended (install the CUDA-matched wheel)
+
+# ------------------------------------------------------------------ MinerU (two paths in your code)
+# Cloud path  -> just the MINERU_TOKEN env var (no package needed; app.py calls mineru.net API)
+# Local path  -> the `mineru` CLI must be on PATH (app.py shells out to it)
+mineru>=4.0,<5          # provides the `mineru` CLI used by mineru_local_extract()
+# Optional: GPU acceleration for local MinerU (needs NVIDIA, Volta+, 8GB+ VRAM):
+# mineru[full]>=4.0,<5
+
+# ------------------------------------------------------------------ Chandra OCR (optional — GPU + vLLM)
+# chandra-ocr          # provides the `chandra` CLI used by _chandra()
+
+# ------------------------------------------------------------------ Word export
+python-docx
