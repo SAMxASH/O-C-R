@@ -1,0 +1,1482 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ocr- Smooth Like BUTTER</title>
+<script>
+  /* set the theme before first paint (no flash) */
+  try { const t = JSON.parse(localStorage.getItem('ocr.theme'));
+    const d = t === 'dark' || ((!t || t === 'auto') && matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.dataset.theme = d ? 'dark' : 'light'; } catch (e) {}
+</script>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --panel2: #f9fafb; --text: #151821; --muted: #6b7385; --line: #e2e5ec;
+    --accent: #2f5bd8; --accent-soft: #e8eefc; --accent-text: #ffffff;
+    --new: #8a94a8; --proc: #c77700; --proc-soft: #fdf1da; --nb: #12875a; --nb-soft: #dff4e9;
+    --danger: #c9372c; --danger-soft: #fbe6e3;
+    --mark: rgba(255, 207, 51, .55); --mark-cur: rgba(255, 122, 26, .70);
+    --toast: #151821; --toast-text: #ffffff;
+    --shadow: 0 1px 2px rgba(20,25,40,.06), 0 6px 18px rgba(20,25,40,.05);
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1014; --panel: #171a21; --panel2: #12151b; --text: #e8eaf0; --muted: #9aa2b5; --line: #2a2f3d;
+    --accent: #84a2ff; --accent-soft: #212848; --accent-text: #0e1118;
+    --new: #6a738b; --proc: #f0b13b; --proc-soft: #3a2e12; --nb: #3ecf93; --nb-soft: #0f3326;
+    --danger: #f27c72; --danger-soft: #402023;
+    --mark: rgba(250, 204, 21, .38); --mark-cur: rgba(255, 140, 40, .65);
+    --toast: #e8eaf0; --toast-text: #0e1118;
+    --shadow: 0 1px 2px rgba(0,0,0,.5);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; font-size: 14px;
+         background: var(--bg); color: var(--text); }
+  button { cursor: pointer; font: inherit; font-size: 13px; padding: 5px 11px; border-radius: 8px;
+           border: 1px solid var(--line); background: var(--panel); color: var(--text); transition: border-color .12s, background .12s; }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button:disabled { cursor: wait; opacity: .5; }
+  input, select, textarea { font: inherit; background: var(--panel); color: var(--text);
+                            border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; }
+  input[type=checkbox] { padding: 0; width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+  kbd { font: 11px ui-monospace, Consolas, monospace; border: 1px solid var(--line); border-bottom-width: 2px;
+        border-radius: 4px; padding: 0 5px; background: var(--bg); }
+  code { font: 12px ui-monospace, Consolas, monospace; background: var(--bg); padding: 0 4px; border-radius: 4px; }
+  .small { font-size: 12px; color: var(--muted); }
+  .primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .primary:hover:not(:disabled) { color: var(--accent-text); opacity: .9; }
+  .danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); }
+  .danger:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+  .iconbtn { padding: 5px 9px; min-width: 32px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: var(--panel); padding: 5px 10px; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+  /* ------------------------------------------------ navbar */
+  #nav { position: sticky; top: 0; z-index: 30; background: var(--panel); border-bottom: 1px solid var(--line);
+         box-shadow: var(--shadow); padding: 8px 16px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .row + .row { margin-top: 8px; }
+  .spacer { flex: 1; }
+  .brand { font-size: 16px; margin-right: 4px; letter-spacing: .01em; }
+  #docs { max-width: 280px; }
+  #docname { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #themebtn { min-width: 84px; }
+
+  .tabs { display: inline-flex; gap: 2px; background: var(--bg); padding: 3px; border-radius: 10px; border: 1px solid var(--line); }
+  .tabbtn { border: 0; background: transparent; border-radius: 8px; padding: 5px 14px; font-weight: 500; }
+  .tabbtn .n { opacity: .8; font-size: 12px; margin-left: 4px; font-variant-numeric: tabular-nums; }
+  .tabbtn kbd { margin-left: 6px; opacity: .6; font-size: 10px; background: transparent; }
+  .tabbtn:hover:not(:disabled) { background: var(--panel); }
+  .tabbtn.active[data-tab="pages"]  { background: var(--new);  color: #fff; }
+  .tabbtn.active[data-tab="proc"]   { background: var(--proc); color: #fff; }
+  .tabbtn.active[data-tab="nb"]     { background: var(--nb);   color: #fff; }
+  .tabbtn.active[data-tab="search"] { background: var(--accent); color: var(--accent-text); }
+  .tabbtn.active kbd { color: inherit; border-color: currentColor; }
+  .navctl { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  #curlabel { font-variant-numeric: tabular-nums; min-width: 96px; text-align: center; font-weight: 600; }
+  #goto { width: 76px; }
+
+  #map { position: relative; display: flex; height: 12px; border-radius: 6px; overflow: hidden; cursor: pointer;
+         background: var(--line); flex: 1; min-width: 160px; }
+  #map i { flex: 1 1 0; min-width: 0; background: var(--new); opacity: .5; }
+  #map i.s-proc { background: var(--proc); opacity: 1; }
+  #map i.s-nb { background: var(--nb); opacity: 1; }
+  #mapcur { position: absolute; top: -2px; bottom: -2px; width: 3px; background: var(--accent); border-radius: 2px;
+            box-shadow: 0 0 0 2px var(--panel); pointer-events: none; }
+  #maptip { position: fixed; z-index: 60; pointer-events: none; background: var(--toast); color: var(--toast-text);
+            font-size: 12px; padding: 2px 8px; border-radius: 6px; }
+  .legend { display: inline-flex; gap: 10px; font-size: 11px; color: var(--muted); }
+  .legend b { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+
+  #selbar { background: var(--accent-soft); border-radius: 9px; padding: 6px 10px; }
+  #selbar b { color: var(--accent); }
+
+  #tools { position: absolute; right: 16px; top: 100%; margin-top: 6px; width: 440px; max-width: calc(100vw - 32px);
+           max-height: calc(100vh - 140px); overflow: auto;
+           background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 34px rgba(0,0,0,.22);
+           padding: 14px 16px; display: grid; gap: 16px; }
+  #tools h4 { margin: 0 0 7px; font-size: 13px; font-weight: 600; }
+  #tools .line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  #tools .line + .line { margin-top: 8px; }
+
+  main { padding: 14px 16px 90px; }
+
+  /* ------------------------------------------------ floating helpers */
+  #fab { position: fixed; right: 16px; bottom: 16px; z-index: 25; display: grid; gap: 6px; }
+  #fab button { width: 38px; height: 38px; border-radius: 50%; padding: 0; font-size: 16px; box-shadow: var(--shadow); }
+  #jobs { position: fixed; right: 66px; bottom: 16px; z-index: 25; width: 360px; max-width: calc(100vw - 90px); }
+  #jobs .job { background: var(--panel); border: 1px solid var(--line); border-left: 5px solid var(--proc);
+               border-radius: 10px; padding: 8px 10px; margin-top: 6px; font-size: 13px; box-shadow: var(--shadow);
+               display: grid; gap: 4px; }
+  #jobs .job.ok { border-left-color: var(--nb); }
+  #jobs .job.bad { border-left-color: var(--danger); }
+  #jobs .top { display: flex; gap: 8px; align-items: center; }
+  #jobs .msg { overflow-wrap: anywhere; }
+  .progress { flex: 1; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+  .progress i { display: block; height: 100%; background: var(--proc); transition: width .3s; }
+  #toast { position: fixed; left: 16px; bottom: 16px; background: var(--toast); color: var(--toast-text);
+           border-radius: 10px; padding: 9px 14px; max-width: 460px; box-shadow: 0 4px 14px rgba(0,0,0,.25); z-index: 70;
+           display: flex; gap: 12px; align-items: center; }
+  #toast button { background: transparent; color: inherit; border-color: currentColor; padding: 2px 9px; white-space: nowrap; }
+  #lightbox { position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,.82); overflow: auto; cursor: zoom-out; padding: 20px; }
+  #lightbox img { display: block; margin: 0 auto; width: min(1500px, 96vw); background: #fff; border-radius: 4px; }
+  #dropzone { position: fixed; inset: 0; z-index: 90; background: color-mix(in srgb, var(--accent) 22%, transparent);
+              border: 4px dashed var(--accent); display: grid; place-items: center; font-size: 22px; font-weight: 600;
+              color: var(--accent); pointer-events: none; }
+
+  /* ------------------------------------------------ tabs + toolbars */
+  .tab { display: none; }
+  .tab.on { display: block; }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; padding: 8px 10px;
+             background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  .findbar { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .findbar .f-q { width: 260px; }
+  .f-count { min-width: 120px; font-variant-numeric: tabular-nums; }
+  .grid { display: grid; gap: 14px; align-items: start; }
+  #list-new { grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); }
+  #list-proc, #list-nb { grid-template-columns: repeat(var(--rcols, 1), minmax(0, 1fr)); }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-left: 5px solid var(--new);
+          border-radius: 12px; padding: 10px; min-width: 0; box-shadow: var(--shadow);
+          scroll-margin-top: calc(var(--navh, 130px) + 10px); }
+  .card[data-stage="proc"] { border-left-color: var(--proc); }
+  .card[data-stage="nb"]   { border-left-color: var(--nb); }
+  .card.flash { outline: 3px solid var(--accent); }
+  .card.picked { background: color-mix(in srgb, var(--accent-soft) 55%, var(--panel)); }
+  .head { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .head .chip { padding: 1px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+  .card[data-stage="proc"] .chip { background: var(--proc-soft); color: var(--proc); }
+  .card[data-stage="nb"] .chip   { background: var(--nb-soft);   color: var(--nb); }
+  .badge { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; }
+  .badge:empty { display: none; }
+  .badge.low { color: var(--danger); border-color: var(--danger); }
+  .status { font-size: 12px; color: var(--proc); }
+  .status:empty { display: none; }
+
+  .body { display: block; }
+  .split .body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+  .split .body.single { grid-template-columns: minmax(0, 1fr); }
+  .wrap { position: relative; display: block; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); background: #fff; cursor: zoom-in; }
+  .wrap img { width: 100%; display: block; }
+  .wrap.snip { cursor: crosshair; touch-action: none; outline: 2px dashed var(--accent); outline-offset: -2px; }
+  .sel { position: absolute; border: 2px dashed var(--accent); background: rgba(47,91,216,.2); pointer-events: none; }
+  .side { min-width: 0; }
+  .editor { margin-top: 8px; --edh: 240px; }
+  .split .editor { margin-top: 0; --edh: clamp(380px, calc(100vh - 330px), 900px); }
+  .b-img.on, .b-prev.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+  .b-ocr, .b-tonb { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .b-ocr:hover:not(:disabled), .b-tonb:hover:not(:disabled) { color: var(--accent-text); opacity: .9; }
+  .b-save { border-color: var(--nb); color: var(--nb); }
+  .b-snip { border-color: var(--proc); color: var(--proc); }
+  .b-snip.on { background: var(--proc-soft); }
+  .b-cancel { color: var(--danger); }
+  .b-cancel:disabled { opacity: 1; cursor: pointer; }
+  .c-engine { max-width: 170px; padding: 4px 6px; font-size: 12px; }
+
+  /* formatting toolbar */
+  .fmt { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+  .fmt .seg button { padding: 3px 9px; font-size: 12px; min-width: 30px; }
+  .fmt.previewing .seg { opacity: .4; pointer-events: none; }
+
+  .lfind { display: flex; gap: 4px; align-items: center; margin-bottom: 6px; }
+  .lfind .lf-q { width: 190px; padding: 3px 8px; font-size: 12px; }
+  .lfind .iconbtn { padding: 2px 7px; font-size: 11px; min-width: 26px; }
+  .lf-count { min-width: 64px; font-variant-numeric: tabular-nums; }
+
+  /* editor with a highlight layer behind the text (this is what makes search matches visible inside the text box) */
+  .tawrap { position: relative; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+  .tawrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .tawrap .hl, .tawrap textarea {
+    font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; padding: 8px 10px; margin: 0; border: 0;
+    white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; letter-spacing: normal; tab-size: 4; }
+  .tawrap .hl { position: absolute; inset: 0; overflow-y: auto; scrollbar-gutter: stable; color: transparent;
+                pointer-events: none; scrollbar-color: transparent transparent; }
+  .tawrap .hl::-webkit-scrollbar-thumb, .tawrap .hl::-webkit-scrollbar-track { background: transparent; }
+  .tawrap .hl mark { background: var(--mark); color: transparent; font-weight: inherit; padding: 0;
+                     border-radius: 2px; box-shadow: 0 0 0 1px var(--mark); }
+  .tawrap .hl mark.cur { background: var(--mark-cur); box-shadow: 0 0 0 2px var(--mark-cur); }
+  .tawrap textarea { position: relative; z-index: 1; display: block; width: 100%; height: var(--edh); resize: vertical;
+                     background: transparent; border-radius: 8px; outline: none; overflow-y: auto; scrollbar-gutter: stable; }
+
+  /* rendered preview (headings / lists / bold / italic) */
+  .preview, .md { line-height: 1.55; }
+  .preview { height: var(--edh); overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 6px 16px; background: var(--panel); }
+  .preview h1, .md h1 { font-size: 1.5em; } .preview h2, .md h2 { font-size: 1.28em; } .preview h3, .md h3 { font-size: 1.12em; }
+  .preview h1, .preview h2, .preview h3, .preview h4, .md h1, .md h2, .md h3, .md h4 { margin: .9em 0 .35em; line-height: 1.25; }
+  .preview p, .md p { margin: .55em 0; } .preview ul, .preview ol, .md ul, .md ol { margin: .4em 0; padding-left: 1.5em; }
+  .colmark { color: var(--muted); font: italic 12px system-ui; border-top: 1px dashed var(--line); margin: 1em 0 .4em; padding-top: 3px; }
+
+  .actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .dirty { font-size: 12px; color: var(--danger); }
+
+  .hit { background: var(--panel); border: 1px solid var(--line); border-left: 5px solid var(--accent);
+         border-radius: 12px; padding: 12px 14px; margin: 10px 0; box-shadow: var(--shadow); }
+  .hit .meta { font-size: 12px; margin-bottom: 6px; color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .hit .crumb { font-size: 12px; color: var(--muted); font-weight: 600; }
+  mark { background: var(--mark); color: inherit; font-weight: 600; border-radius: 2px; padding: 0 1px; }
+  .empty { color: var(--muted); padding: 28px 0; text-align: center; }
+  @media (max-width: 900px) {
+    .split .body { grid-template-columns: minmax(0, 1fr); }
+    #list-new { grid-template-columns: repeat(min(var(--cols, 2), 2), minmax(0, 1fr)); }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<header id="nav">
+  <div class="row">
+    <b class="brand">&#129419; butter-fly</b>
+    <input type="file" id="file" accept=".pdf" hidden>
+    <button class="primary" id="upbtn" onclick="$('file').click()">Open PDF&hellip;</button>
+    <select id="docs" onchange="openDoc(this.value)" title="Previously opened documents"><option value="">Previous documents</option></select>
+    <span id="docname" class="small"></span>
+    <span id="upinfo" class="small"></span>
+    <span class="spacer"></span>
+    <label class="small">Engine <select id="engine" onchange="LS.set('engine2', this.value)"></select></label>
+    <button id="toolsbtn" onclick="toggleTools()">Tools</button>
+    <button id="themebtn" onclick="toggleTheme()"></button>
+  </div>
+
+  <div class="row">
+    <div class="tabs" role="tablist">
+      <button class="tabbtn" data-tab="pages" onclick="tab('pages')">Pages<span class="n"><span id="c-new">0</span></span><kbd>1</kbd></button>
+      <button class="tabbtn" data-tab="proc" onclick="tab('proc')">Processed<span class="n"><span id="c-proc">0</span></span><kbd>2</kbd></button>
+      <button class="tabbtn" data-tab="nb" onclick="tab('nb')">Notebook<span class="n"><span id="c-nb">0</span></span><kbd>3</kbd></button>
+      <button class="tabbtn" data-tab="search" onclick="tab('search')">Search<kbd>4</kbd></button>
+    </div>
+    <span class="spacer"></span>
+    <div class="navctl" id="navctl">
+      <button class="iconbtn" onclick="step(-1)" title="Previous card (K)">&#9664;</button>
+      <span id="curlabel">p. - / -</span>
+      <button class="iconbtn" onclick="step(1)" title="Next card (J)">&#9654;</button>
+      <button onclick="jumpStage('new')" title="Next page with no text yet (N)">Next new</button>
+      <button onclick="jumpStage('proc')" title="Next page waiting for review (R)">Next to review</button>
+      <input id="goto" type="number" min="1" placeholder="page #" onkeydown="if(event.key==='Enter')goPage(+this.value)">
+      <button onclick="goPage(+$('goto').value)">Go</button>
+    </div>
+  </div>
+
+  <div class="row" id="maprow">
+    <div id="map" title="Click to jump to a page"><div id="mapcur"></div></div>
+    <span class="legend"><span><b style="background:var(--new)"></b>new</span><span><b style="background:var(--proc)"></b>processed</span><span><b style="background:var(--nb)"></b>notebook</span></span>
+  </div>
+
+  <div class="row" id="selbar" hidden>
+    <b id="selcount"></b>
+    <button id="sb-ocr" class="primary" onclick="bulkOcr()">OCR selected</button>
+    <button id="sb-tonb" onclick="bulkMove('to_nb')">Add to notebook</button>
+    <button id="sb-fromnb" onclick="bulkMove('from_nb')">Back to processed</button>
+    <button id="sb-fix" onclick="bulkFix()">Fix text</button>
+    <button id="sb-del" class="danger" onclick="bulkDelete()">Delete text</button>
+    <span class="spacer"></span>
+    <button onclick="clearSel()">Clear selection</button>
+  </div>
+
+  <div id="tools" hidden>
+    <div>
+      <h4>Layout</h4>
+      <div class="line"><span class="small" style="width:110px">Pages tab columns</span>
+        <span class="seg" id="seg-pcols"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button></span></div>
+      <div class="line"><span class="small" style="width:110px">Review tabs</span>
+        <span class="seg" id="seg-rmode"><button data-v="split">Image beside text</button><button data-v="2">2 columns</button><button data-v="3">3 columns</button></span></div>
+      <div class="line">
+        <label><input type="checkbox" id="advance" onchange="S.advance=this.checked;LS.set('advance',S.advance)"> after moving a page, jump to the next one in this tab</label>
+      </div>
+      <div class="line">
+        <button onclick="setAllImages(false)">Hide all images</button>
+        <button onclick="setAllImages(true)">Show all images</button>
+      </div>
+    </div>
+    <div>
+      <h4>Batch OCR</h4>
+      <div class="line">
+        pages <input id="bfrom" type="number" min="1" placeholder="1" style="width:70px"> to
+        <input id="bto" type="number" min="1" placeholder="last" style="width:70px">
+        <button id="runbatch" class="primary" onclick="runBatch()">Run batch</button>
+      </div>
+      <div class="line"><label><input type="checkbox" id="bskip" checked> skip pages that already have text</label></div>
+      <div class="line"><label title="Pages with a text-quality score of 0.90 or more go straight to the Notebook"><input type="checkbox" id="bnb"> add good pages (quality 0.90+) to the notebook automatically</label></div>
+      <div class="line"><label><input type="checkbox" id="formula"> formula recognition (MinerU cloud only)</label></div>
+      <div class="small" style="margin-top:6px">Uses the engine chosen in the top bar. With MinerU, pages are sent in groups so the models load once per group.</div>
+    </div>
+    <div>
+      <h4>Document</h4>
+      <div class="line"><button class="danger" onclick="deleteDoc()">Delete this document&hellip;</button>
+        <span class="small">removes the PDF and all its text</span></div>
+    </div>
+    <div class="small">
+      Keys: <kbd>1</kbd>&ndash;<kbd>4</kbd> tabs &nbsp; <kbd>J</kbd>/<kbd>K</kbd> next/prev &nbsp; <kbd>N</kbd> next new &nbsp; <kbd>R</kbd> next to review &nbsp;
+      <kbd>F</kbd> find in text (Processed / Notebook) &nbsp; <kbd>G</kbd> go to page &nbsp; <kbd>/</kbd> search &nbsp; <kbd>Esc</kbd> close<br>
+      In a text box: <kbd>Ctrl</kbd>+<kbd>S</kbd> save &nbsp; <kbd>Ctrl</kbd>+<kbd>Enter</kbd> add to notebook / save &nbsp;
+      <kbd>Ctrl</kbd>+<kbd>B</kbd> bold &nbsp; <kbd>Ctrl</kbd>+<kbd>I</kbd> italic &nbsp; <kbd>Ctrl</kbd>+<kbd>F</kbd> find in this page &nbsp; <kbd>Shift</kbd>+click a checkbox to select a range.<br>
+      Headings and lists are stored as Markdown (<code>## Heading</code>, <code>- item</code>, <code>1. item</code>, <code>**bold**</code>) and are kept in Markdown, HTML, Word and JSON downloads and in Search.
+    </div>
+  </div>
+</header>
+
+<main>
+  <div id="tab-pages" class="tab on">
+    <div class="toolbar">
+      <button onclick="selectAll('list-new')">Select all shown</button>
+      <span class="small">Tick pages to OCR many at once, or use each page's own buttons. Click a page image to enlarge it.</span>
+    </div>
+    <div id="list-new" class="grid"></div>
+    <p style="text-align:center"><button id="more" onclick="loadMore()" hidden>Load more</button></p>
+    <p id="pages-empty" class="empty">Open a PDF (button above) or drop one anywhere on this page.</p>
+  </div>
+
+  <div id="tab-proc" class="tab">
+    <div class="toolbar">
+      <div class="findbar" data-gid="list-proc">
+        <input type="search" class="f-q" placeholder="Find in page text (Enter = next)">
+        <button class="iconbtn f-prev" title="Previous match (Shift+Enter)">&#9650;</button>
+        <button class="iconbtn f-next" title="Next match (Enter)">&#9660;</button>
+        <span class="small f-count"></span>
+        <label class="small"><input type="checkbox" class="f-only" checked> only matching pages</label>
+      </div>
+      <span class="spacer"></span>
+      <button onclick="selectAll('list-proc')">Select all shown</button>
+      <button onclick="fixAllShown('list-proc')" title="Convert $math$, join hyphenated line breaks, tidy spaces and bullets on every shown page">Fix text of all shown</button>
+      <button class="primary" onclick="addAllShown()">Add all shown to notebook</button>
+    </div>
+    <div id="list-proc" class="grid"></div>
+    <p id="proc-empty" class="empty">Nothing to review. OCR some pages from the Pages tab.</p>
+  </div>
+
+  <div id="tab-nb" class="tab">
+    <div class="toolbar">
+      <div class="findbar" data-gid="list-nb">
+        <input type="search" class="f-q" placeholder="Find in page text (Enter = next)">
+        <button class="iconbtn f-prev" title="Previous match (Shift+Enter)">&#9650;</button>
+        <button class="iconbtn f-next" title="Next match (Enter)">&#9660;</button>
+        <span class="small f-count"></span>
+        <label class="small"><input type="checkbox" class="f-only" checked> only matching pages</label>
+      </div>
+      <span class="spacer"></span>
+      <button onclick="selectAll('list-nb')">Select all shown</button>
+      <button onclick="fixAllShown('list-nb')">Fix text of all shown</button>
+      <button class="danger" onclick="removeAllShown()">Move all shown back to processed</button>
+    </div>
+    <div class="toolbar">
+      <select id="expfmt" title="Export format">
+        <option value="md">Markdown (.md)</option>
+        <option value="docx">Word (.docx)</option>
+        <option value="html">Web page (.html)</option>
+        <option value="txt">Plain text (.txt)</option>
+        <option value="json">JSON (.json)</option>
+      </select>
+      <label class="small"><input type="checkbox" id="exppages" checked> page separators</label>
+      <label class="small"><input type="checkbox" id="expcols" checked> column separators</label>
+      <button class="primary" onclick="exportNb()">Download</button>
+      <button onclick="exportNb('both')" title="Downloads the .json and the .txt">Download JSON + TXT</button>
+      <button onclick="copyAll()">Copy all text</button>
+      <span class="small">Headings, lists, bold and italic you set are kept in the download.</span>
+    </div>
+    <div id="list-nb" class="grid"></div>
+    <p id="nb-empty" class="empty">The notebook is empty. Review pages in Processed and add them here.</p>
+  </div>
+
+  <div id="tab-search" class="tab">
+    <div class="toolbar">
+      <input id="q" type="search" size="50" style="width:min(520px,100%)" placeholder="Type a heading, keyword or question" onkeydown="if(event.key==='Enter')doSearch()">
+      <button id="sbtn" class="primary" onclick="doSearch()">Search</button>
+      <label class="small"><input type="checkbox" id="rel"> include related (meaning-based) results</label>
+      <span class="small">Searches only pages in the notebook. The first search loads the model.</span>
+    </div>
+    <div id="hits"></div>
+  </div>
+</main>
+
+<div id="jobs"></div>
+<div id="fab">
+  <button onclick="scrollTo({top: 0})" title="Top (Home)">&uarr;</button>
+  <button onclick="scrollTo({top: document.body.scrollHeight})" title="Bottom (End)">&darr;</button>
+</div>
+<div id="maptip" hidden></div>
+<div id="toast" hidden></div>
+<div id="lightbox" hidden onclick="closeLb()"><img id="lbimg" alt=""></div>
+<div id="dropzone" hidden>Drop the PDF to open it</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const STEP = innerWidth > 1600 ? 50 : innerWidth > 1000 ? 30 : 20;
+const GRID = {pages: 'list-new', proc: 'list-proc', nb: 'list-nb'};
+const STAGE_TAB = {new: 'pages', proc: 'proc', nb: 'nb'};
+const TAB_LABEL = {pages: 'Pages', proc: 'Processed', nb: 'Notebook'};
+
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem('ocr.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('ocr.' + k, JSON.stringify(v)); } catch (e) {} },
+};
+const S = {pcols: LS.get('pcols', innerWidth > 1300 ? 3 : 2), rmode: LS.get('rmode', 'split'),
+           advance: LS.get('advance', true), theme: LS.get('theme', 'auto')};
+
+let doc = null, cards = {}, next = 1, cur = 1, activeTab = null, ENGINES = [];
+const selected = new Set();
+const FIND = {'list-proc': {q: '', re: null, only: true, curPage: null, curIdx: -1},
+              'list-nb':   {q: '', re: null, only: true, curPage: null, curIdx: -1}};
+const scrollMem = {};
+let lastSel = null;
+
+async function api(url, opt) {
+  const r = await fetch(url, opt);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+const post = (url, body) => api(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+
+let toastTimer;
+function toast(msg, long, action) {
+  const t = $('toast'); t.textContent = ''; t.hidden = false;
+  const s = document.createElement('span'); s.textContent = msg; t.appendChild(s);
+  if (action) {
+    const b = document.createElement('button'); b.textContent = action.label;
+    b.onclick = () => { t.hidden = true; action.fn(); }; t.appendChild(b);
+  }
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, long ? 7000 : action ? 5000 : 2500);
+}
+
+// ---------------------------------------------------------------- theme (light <-> dark toggle) + view settings
+const mq = matchMedia('(prefers-color-scheme: dark)');
+const effTheme = () => S.theme === 'auto' ? (mq.matches ? 'dark' : 'light') : S.theme;
+function applyTheme() {
+  const t = effTheme();
+  document.documentElement.dataset.theme = t;
+  $('themebtn').textContent = t === 'dark' ? '\u2600 Light' : '\u263E Dark';
+  $('themebtn').title = 'Switch to ' + (t === 'dark' ? 'light' : 'dark') + ' mode';
+}
+function toggleTheme() { S.theme = effTheme() === 'dark' ? 'light' : 'dark'; LS.set('theme', S.theme); applyTheme(); }
+mq.addEventListener('change', applyTheme);
+
+function applyView() {
+  const root = document.documentElement.style;
+  root.setProperty('--cols', S.pcols);
+  root.setProperty('--rcols', S.rmode === 'split' ? 1 : +S.rmode);
+  ['list-proc', 'list-nb'].forEach(id => $(id).classList.toggle('split', S.rmode === 'split'));
+  document.querySelectorAll('#seg-pcols button').forEach(b => b.classList.toggle('on', b.dataset.v == S.pcols));
+  document.querySelectorAll('#seg-rmode button').forEach(b => b.classList.toggle('on', b.dataset.v == S.rmode));
+  $('advance').checked = S.advance;
+}
+$('seg-pcols').onclick = e => { const v = e.target.dataset.v; if (v) { S.pcols = +v; LS.set('pcols', S.pcols); applyView(); } };
+$('seg-rmode').onclick = e => { const v = e.target.dataset.v; if (v) { S.rmode = v; LS.set('rmode', v); applyView(); } };
+
+new ResizeObserver(() => document.documentElement.style.setProperty('--navh', $('nav').offsetHeight + 'px')).observe($('nav'));
+
+function toggleTools(force) { $('tools').hidden = force !== undefined ? !force : !$('tools').hidden; }
+document.addEventListener('click', e => {
+  if (!$('tools').hidden && !e.target.closest('#tools') && !e.target.closest('#toolsbtn')) toggleTools(false);
+});
+
+// ---------------------------------------------------------------- markdown helpers (render + format)
+const HEAD_RE = /^\s{0,3}(#{1,6})\s+(.*\S)\s*$/;
+const LIST_RE = /^\s{0,6}([-*•●▪◦]|\d{1,3}[.)])\s+(.+\S)\s*$/;
+const COL_RE = /^─+ column (\d+) ─+$/;
+const PREFIX_RE = /^(\s{0,3}#{1,6}\s+|\s*(?:[-*•●▪◦]|\d{1,3}[.)])\s+)/;
+
+function mdInline(s, re) {
+  let out = '';
+  if (re) {
+    let last = 0;
+    for (const m of s.matchAll(re)) {
+      if (!m[0]) continue;
+      out += esc(s.slice(last, m.index)) + '<mark>' + esc(m[0]) + '</mark>';
+      last = m.index + m[0].length;
+    }
+    out += esc(s.slice(last));
+  } else out = esc(s);
+  return out.replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/(?<!\*)\*(?!\s)([^*\n]+?)(?<!\s)\*(?!\*)/g, '<em>$1</em>');
+}
+function parseBlocks(text) {
+  const blocks = []; let para = [], lastList = false;
+  const flush = () => { if (para.length) { blocks.push(['p', para.join('\n')]); para = []; } };
+  for (const raw of text.split('\n')) {
+    const s = raw.trim();
+    if (!s) { flush(); lastList = false; continue; }
+    let m = COL_RE.exec(s);
+    if (m) { flush(); blocks.push(['col', m[1]]); lastList = false; continue; }
+    m = HEAD_RE.exec(raw);
+    if (m) { flush(); blocks.push(['h', m[1].length, m[2].trim()]); lastList = false; continue; }
+    m = LIST_RE.exec(raw);
+    if (m) {
+      flush();
+      const kind = /\d/.test(m[1][0]) ? 'ol' : 'ul', last = blocks[blocks.length - 1];
+      if (last && last[0] === kind) last[1].push(m[2]); else blocks.push([kind, [m[2]]]);
+      lastList = true; continue;
+    }
+    if (lastList && /^[ \t]/.test(raw)) { const l = blocks[blocks.length - 1][1]; l[l.length - 1] += ' ' + s; continue; }
+    lastList = false; para.push(s);
+  }
+  flush();
+  return blocks;
+}
+function renderMd(text, re) {
+  return parseBlocks(text).map(b => {
+    if (b[0] === 'h') { const l = Math.min(b[1], 6); return `<h${l}>${mdInline(b[2], re)}</h${l}>`; }
+    if (b[0] === 'ul' || b[0] === 'ol') return `<${b[0]}>` + b[1].map(i => `<li>${mdInline(i, re)}</li>`).join('') + `</${b[0]}>`;
+    if (b[0] === 'col') return `<div class="colmark">column ${b[1]}</div>`;
+    return `<p>${mdInline(b[1], re).replace(/\n/g, '<br>')}</p>`;
+  }).join('');
+}
+
+// -- editing helpers: operate on the selected lines of a textarea (and keep the browser's undo stack)
+function replaceRange(ta, a, b, text) {
+  ta.focus(); ta.setSelectionRange(a, b);
+  let ok = false;
+  try { ok = document.execCommand('insertText', false, text); } catch (e) {}
+  if (!ok || ta.value.slice(a, a + text.length) !== text) { ta.setRangeText(text, a, b, 'end'); ta.dispatchEvent(new Event('input')); }
+}
+function lineRange(ta) {
+  const v = ta.value, s = ta.selectionStart, e = ta.selectionEnd;
+  const a = s > 0 ? v.lastIndexOf('\n', s - 1) + 1 : 0;
+  let b = v.indexOf('\n', e > s ? e - 1 : e);
+  if (b < 0) b = v.length;
+  return [a, Math.max(b, a)];
+}
+function wrapSel(ta, mark) {
+  const v = ta.value; let s = ta.selectionStart, e = ta.selectionEnd;
+  if (s === e) { while (s > 0 && /\S/.test(v[s - 1])) s--; while (e < v.length && /\S/.test(v[e])) e++; if (s === e) return; }
+  const sel = v.slice(s, e), m = mark.length;
+  const text = sel.length >= 2 * m && sel.startsWith(mark) && sel.endsWith(mark) ? sel.slice(m, -m) : mark + sel + mark;
+  replaceRange(ta, s, e, text); ta.setSelectionRange(s, s + text.length);
+}
+function applyFmt(ta, kind) {
+  if (kind === 'b') return wrapSel(ta, '**');
+  if (kind === 'i') return wrapSel(ta, '*');
+  const [a, b] = lineRange(ta);
+  const lines = ta.value.slice(a, b).split('\n');
+  const idx = lines.map((l, i) => i).filter(i => lines[i].trim());
+  if (!idx.length) {                                              // empty line: just insert the mark
+    if (kind === 'clear') return;
+    return replaceRange(ta, a, b, kind[0] === 'h' ? '#'.repeat(+kind[1]) + ' ' : kind === 'ul' ? '- ' : '1. ');
+  }
+  const strip = l => l.replace(PREFIX_RE, '');
+  let out;
+  if (kind[0] === 'h') {
+    const lvl = +kind[1];
+    const all = idx.every(i => { const m = /^\s{0,3}(#{1,6})\s+/.exec(lines[i]); return m && m[1].length === lvl; });
+    out = lines.map(l => !l.trim() ? l : all ? strip(l) : '#'.repeat(lvl) + ' ' + strip(l).trimStart());
+  } else if (kind === 'ul') {
+    const all = idx.every(i => /^\s*[-*•●▪◦]\s+/.test(lines[i]));
+    out = lines.map(l => !l.trim() ? l : all ? strip(l) : '- ' + strip(l).trimStart());
+  } else if (kind === 'ol') {
+    const all = idx.every(i => /^\s*\d{1,3}[.)]\s+/.test(lines[i])); let k = 0;
+    out = lines.map(l => !l.trim() ? l : all ? strip(l) : `${++k}. ` + strip(l).trimStart());
+  } else out = lines.map(l => strip(l));
+  const text = out.join('\n');
+  replaceRange(ta, a, b, text); ta.setSelectionRange(a, a + text.length);
+}
+
+const FIXNAMES = {math: 'math expressions', hyphens: 'hyphenated line breaks', spaces: 'extra spaces',
+                  punct: 'spaces before punctuation', bullets: 'bullets', ligatures: 'ligatures', images: 'image links'};
+function fixSummary(ch) {
+  const parts = Object.entries(ch || {}).filter(([, v]) => v).map(([k, v]) => `${v} ${FIXNAMES[k] || k}`);
+  return parts.length ? 'Fixed: ' + parts.join(', ') : 'Nothing to fix - the text is already clean';
+}
+
+// ---------------------------------------------------------------- tabs (each tab remembers its scroll position)
+function tab(n, keepScroll) {
+  if (activeTab) scrollMem[activeTab] = scrollY;
+  activeTab = n;
+  document.querySelectorAll('.tab').forEach(e => e.classList.remove('on'));
+  $('tab-' + n).classList.add('on');
+  document.querySelectorAll('.tabbtn').forEach(b => {
+    const on = b.dataset.tab === n; b.classList.toggle('active', on); b.setAttribute('aria-selected', on);
+  });
+  $('navctl').hidden = n === 'search';
+  $('maprow').hidden = !doc;
+  if (!keepScroll) requestAnimationFrame(() => { scrollTo({top: scrollMem[n] || 0, behavior: 'instant'}); updateCur(); });
+  else updateCur();
+  if (n === 'nb' || n === 'proc') applyFilterAll(GRID[n]);
+}
+
+// ---------------------------------------------------------------- engines
+async function loadEngines() {
+  const list = ENGINES = await api('/api/engines');
+  Object.values(cards).forEach(c => c.fillEngines && c.fillEngines());
+  $('engine').innerHTML = list.map(e =>
+    `<option value="${e.id}" ${e.available ? '' : 'disabled'}>${esc(e.label)}${e.available ? '' : ' (not set up)'}</option>`).join('');
+  const want = LS.get('engine2', 'mineru_local');
+  const ok = id => list.some(e => e.id === id && e.available);
+  $('engine').value = ok(want) ? want : ok('mineru_local') ? 'mineru_local' : 'auto';
+}
+
+// ---------------------------------------------------------------- documents
+async function refreshDocs() {
+  const list = await api('/api/docs');
+  $('docs').innerHTML = '<option value="">Previous documents</option>' +
+    list.map(d => `<option value="${d.id}">${esc(d.name)} (${d.page_count} p, ${d.notebook} in notebook)</option>`).join('');
+  if (doc) $('docs').value = doc.id;
+  return list;
+}
+
+function uploadFile(f) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest(); x.open('POST', '/api/upload');
+    x.upload.onprogress = e => { if (e.lengthComputable) $('upinfo').textContent = `Uploading ${Math.round(100 * e.loaded / e.total)}%`; };
+    x.onload = () => {
+      let j = {}; try { j = JSON.parse(x.responseText); } catch (e) {}
+      x.status < 300 ? resolve(j) : reject(new Error(j.error || x.statusText));
+    };
+    x.onerror = () => reject(new Error('network error'));
+    const fd = new FormData(); fd.append('file', f); x.send(fd);
+  });
+}
+
+async function upload(f) {
+  if (!f) return;
+  if (!/\.pdf$/i.test(f.name)) return toast('Choose a .pdf file', true);
+  const b = $('upbtn'); b.disabled = true;
+  try {
+    const j = await uploadFile(f);
+    $('upinfo').textContent = '';
+    await openDoc(j.id);
+    await refreshDocs();
+  } catch (e) { toast(e.message, true); }
+  $('upinfo').textContent = ''; b.disabled = false; $('file').value = '';
+}
+$('file').onchange = () => upload($('file').files[0]);
+
+let dragDepth = 0;
+addEventListener('dragenter', e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { dragDepth++; $('dropzone').hidden = false; } });
+addEventListener('dragleave', () => { dragDepth = Math.max(dragDepth - 1, 0); if (!dragDepth) $('dropzone').hidden = true; });
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('dropzone').hidden = true; upload(e.dataTransfer.files[0]); });
+
+function resetDocView() {
+  cards = {}; next = 1; cur = 1; selected.clear(); lastSel = null; updateSelBar();
+  Object.values(GRID).forEach(i => $(i).innerHTML = '');
+  for (const g in FIND) Object.assign(FIND[g], {q: '', re: null, curPage: null, curIdx: -1});
+  document.querySelectorAll('.findbar .f-q').forEach(i => i.value = '');
+  document.querySelectorAll('.findbar .f-count').forEach(i => i.textContent = '');
+  for (const k in scrollMem) delete scrollMem[k];
+}
+
+async function openDoc(id) {
+  if (!id) return;
+  if (dirtyCards().length && !confirm('Some pages have unsaved edits. Open another document anyway?')) { if (doc) $('docs').value = doc.id; return; }
+  try { doc = await api('/api/doc/' + id); } catch (e) { toast(e.message, true); return; }
+  LS.set('lastDoc', id);
+  resetDocView();
+  $('docs').value = id;
+  $('bto').placeholder = doc.page_count;
+  buildMap();
+  Object.keys(doc.pages).map(Number).sort((a, b) => a - b).forEach(n => {
+    if (stageOf(n) !== 'new') { cards[n] = makeCard(n); place(n); }
+  });
+  loadMore();
+  refreshCounts();
+  tab('pages');
+  scrollTo({top: 0, behavior: 'instant'});
+}
+
+async function deleteDoc() {
+  if (!doc) return toast('Open a document first');
+  if (!confirm(`Delete "${doc.name}" and all of its text? This cannot be undone.`)) return;
+  try {
+    await api('/api/doc/' + doc.id, {method: 'DELETE'});
+    LS.set('lastDoc', null);
+    doc = null; resetDocView();
+    [...$('map').querySelectorAll('i')].forEach(x => x.remove());
+    $('docname').textContent = ''; ['c-new', 'c-proc', 'c-nb'].forEach(i => $(i).textContent = 0);
+    $('pages-empty').hidden = false; $('more').hidden = true; $('proc-empty').hidden = false; $('nb-empty').hidden = false;
+    $('curlabel').textContent = 'p. - / -';
+    toggleTools(false); tab('pages'); await refreshDocs(); toast('Document deleted');
+  } catch (e) { toast(e.message, true); }
+}
+
+function stageOf(n) {
+  const p = doc.pages[n];
+  if (!p || !p.text.trim()) return 'new';
+  return p.in_notebook ? 'nb' : 'proc';
+}
+
+function insertSorted(box, el) {
+  const n = +el.dataset.page;
+  const after = [...box.children].find(c => +c.dataset.page > n);
+  after ? box.insertBefore(el, after) : box.appendChild(el);
+}
+
+function refreshCounts() {
+  let proc = 0, nb = 0;
+  for (const n in doc.pages) { const s = stageOf(+n); if (s === 'proc') proc++; else if (s === 'nb') nb++; }
+  $('c-new').textContent = doc.page_count - proc - nb;
+  $('c-proc').textContent = proc; $('c-nb').textContent = nb;
+  $('proc-empty').hidden = proc > 0; $('nb-empty').hidden = nb > 0;
+  $('pages-empty').hidden = !!doc;
+  const pct = Math.round(100 * nb / doc.page_count);
+  $('docname').textContent = `${doc.name} - ${doc.page_count} pages, ${nb} in notebook (${pct}%)`;
+  $('docname').title = $('docname').textContent;
+}
+
+function buildMap() {
+  const m = $('map');
+  [...m.querySelectorAll('i')].forEach(x => x.remove());
+  const frag = document.createDocumentFragment();
+  for (let n = 1; n <= doc.page_count; n++) {
+    const i = document.createElement('i'); i.className = 's-' + stageOf(n); frag.appendChild(i);
+  }
+  m.insertBefore(frag, $('mapcur'));
+}
+const pageAtX = x => {
+  const r = $('map').getBoundingClientRect();
+  return Math.min(Math.max(Math.floor((x - r.left) / r.width * doc.page_count) + 1, 1), doc.page_count);
+};
+$('map').addEventListener('click', e => { if (doc) goPage(pageAtX(e.clientX)); });
+$('map').addEventListener('mousemove', e => {
+  if (!doc) return;
+  const n = pageAtX(e.clientX), t = $('maptip');
+  const label = {new: 'new', proc: 'processed', nb: 'notebook'}[stageOf(n)];
+  t.textContent = 'p. ' + n + ' - ' + label;
+  t.style.left = e.clientX + 12 + 'px'; t.style.top = e.clientY + 18 + 'px'; t.hidden = false;
+});
+$('map').addEventListener('mouseleave', () => $('maptip').hidden = true);
+
+// ---------------------------------------------------------------- find in text (Processed + Notebook)
+function buildRe(q) {
+  q = q.trim();
+  if (!q) return null;
+  return new RegExp(q.split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+'), 'gi');
+}
+const countIn = (text, re) => (text.match(re) || []).length;
+
+function matches(n, gid) {
+  const F = FIND[gid];
+  if (!F || !F.re || !F.only) return true;
+  if (+F.q.trim() === n) return true;                       // typing a page number also shows that page
+  const c = cards[n];
+  return !!c && c.text().search(F.re) >= 0;
+}
+function applyFilterAll(gid) {
+  if (!doc) return;
+  [...$(gid).children].forEach(c => c.hidden = !matches(+c.dataset.page, gid));
+}
+const visibleCards = gid => [...$(gid).children].filter(c => !c.hidden);
+
+function collectHits(gid) {
+  const F = FIND[gid], hits = [];
+  if (!F.re) return hits;
+  for (const el of $(gid).children) {
+    if (el.hidden) continue;
+    const n = +el.dataset.page, cnt = countIn(cards[n].text(), F.re);
+    if (cnt) hits.push({n, cnt});
+  }
+  return hits;
+}
+function setFindUI(gid, txt) { document.querySelector(`.findbar[data-gid="${gid}"] .f-count`).textContent = txt; }
+
+function runFind(gid, goFirst = true) {
+  const F = FIND[gid];
+  F.re = buildRe(F.q); F.curPage = null; F.curIdx = -1;
+  let total = 0, pagesWith = 0;
+  for (const el of $(gid).children) {
+    const n = +el.dataset.page, c = cards[n];
+    const cnt = F.re ? countIn(c.text(), F.re) : 0;
+    el.hidden = !!F.re && F.only && cnt === 0 && +F.q.trim() !== n;
+    if (cnt) { total += cnt; pagesWith++; }
+    c.setFind(F.re, -1);
+  }
+  if (!F.re) return setFindUI(gid, '');
+  setFindUI(gid, total ? `${total} matches in ${pagesWith} page${pagesWith > 1 ? 's' : ''}` : 'No matches');
+  if (goFirst && total) findStep(gid, 1);
+}
+
+function findStep(gid, dir) {
+  const F = FIND[gid];
+  if (!F.re) return;
+  const hits = collectHits(gid);
+  if (!hits.length) return setFindUI(gid, 'No matches');
+  const total = hits.reduce((a, h) => a + h.cnt, 0);
+  let curFlat = -1, base = 0;
+  for (const h of hits) {
+    if (h.n === F.curPage) { curFlat = base + Math.min(Math.max(F.curIdx, 0), h.cnt - 1); break; }
+    base += h.cnt;
+  }
+  const nx = curFlat < 0 ? (dir > 0 ? 0 : total - 1) : (curFlat + dir + total) % total;
+  let acc = 0, page = hits[0].n, idx = 0;
+  for (const h of hits) { if (nx < acc + h.cnt) { page = h.n; idx = nx - acc; break; } acc += h.cnt; }
+  if (F.curPage && cards[F.curPage]) cards[F.curPage].setFind(F.re, -1);
+  F.curPage = page; F.curIdx = idx;
+  cards[page].el.scrollIntoView({block: 'start'});
+  cards[page].setFind(F.re, idx, true);
+  cur = page; updateCur();
+  setFindUI(gid, `${nx + 1} / ${total} - ${hits.length} page${hits.length > 1 ? 's' : ''}`);
+}
+
+document.querySelectorAll('.findbar').forEach(bar => {
+  const gid = bar.dataset.gid, F = FIND[gid], qi = bar.querySelector('.f-q');
+  let t;
+  const apply = () => { clearTimeout(t); if (doc) { F.q = qi.value; runFind(gid); } };
+  qi.addEventListener('input', () => { clearTimeout(t); t = setTimeout(apply, 180); });
+  qi.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); if (F.q !== qi.value) apply(); else findStep(gid, e.shiftKey ? -1 : 1); }
+    else if (e.key === 'Escape') { qi.value = ''; qi.blur(); apply(); }
+  });
+  bar.querySelector('.f-next').onclick = () => { if (F.q !== qi.value) apply(); else findStep(gid, 1); };
+  bar.querySelector('.f-prev').onclick = () => { if (F.q !== qi.value) apply(); else findStep(gid, -1); };
+  bar.querySelector('.f-only').onchange = e => { F.only = e.target.checked; if (doc) runFind(gid, false); };
+});
+function clearFind(gid) {
+  const F = FIND[gid]; if (!F || !F.q) return;
+  const bar = document.querySelector(`.findbar[data-gid="${gid}"]`);
+  bar.querySelector('.f-q').value = ''; F.q = ''; runFind(gid, false);
+}
+
+function place(n) {
+  const st = stageOf(n), c = cards[n];
+  const g = $(GRID[STAGE_TAB[st]]);
+  insertSorted(g, c.el);
+  c.apply();
+  c.setFind(FIND[g.id] ? FIND[g.id].re : null, -1);
+  c.el.hidden = !matches(n, g.id);
+  const cell = $('map').children[n - 1];
+  if (cell && cell.tagName === 'I') cell.className = 's-' + st;
+  refreshCounts();
+}
+
+function loadMore() {
+  let made = 0;
+  while (made < STEP && next <= doc.page_count) {
+    const n = next++;
+    if (cards[n]) continue;
+    cards[n] = makeCard(n); place(n); made++;
+  }
+  let left = 0;
+  for (let n = next; n <= doc.page_count; n++) if (!cards[n]) left++;
+  $('more').hidden = left === 0;
+  $('more').textContent = `Load more (${left} pages left)`;
+}
+
+// ---------------------------------------------------------------- navigation
+function flash(el) {
+  el.scrollIntoView({block: 'start'});
+  el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1400);
+}
+
+function goPage(n) {
+  if (!doc || !n || n < 1 || n > doc.page_count) return toast('Page out of range');
+  if (!cards[n]) { cards[n] = makeCard(n); place(n); }
+  const t = STAGE_TAB[stageOf(n)];
+  const g = GRID[t];
+  if (cards[n].el.hidden) clearFind(g);
+  tab(t, true);
+  flash(cards[n].el);
+  cur = n; updateCur();
+}
+
+function step(dir) {
+  if (!doc || activeTab === 'search') return;
+  let list = visibleCards(GRID[activeTab]);
+  if (!list.length) return;
+  let i = list.findIndex(c => +c.dataset.page === cur);
+  if (i < 0) i = 0;
+  let t = i + dir;
+  if (t >= list.length && activeTab === 'pages' && !$('more').hidden) { loadMore(); list = visibleCards(GRID[activeTab]); }
+  t = Math.min(Math.max(t, 0), list.length - 1);
+  cur = +list[t].dataset.page; flash(list[t]); updateCur();
+}
+
+function jumpStage(stage) {
+  if (!doc) return;
+  for (let k = 1; k <= doc.page_count; k++) {
+    const n = ((cur - 1 + k) % doc.page_count) + 1;
+    if (stageOf(n) === stage) return goPage(n);
+  }
+  toast(stage === 'new' ? 'No unprocessed pages left' : 'Nothing waiting for review');
+}
+
+let ticking = false;
+function updateCur() {
+  if (!doc) return;
+  const g = $(GRID[activeTab]);
+  if (g) {
+    const navH = $('nav').offsetHeight;
+    for (const c of g.children) {
+      if (c.hidden) continue;
+      if (c.getBoundingClientRect().bottom > navH + 40) { cur = +c.dataset.page; break; }
+    }
+  }
+  $('curlabel').textContent = `p. ${cur} / ${doc.page_count}`;
+  $('mapcur').style.left = `calc(${(cur - 0.5) / doc.page_count * 100}% - 1px)`;
+}
+addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(() => { ticking = false; updateCur(); }); } }, {passive: true});
+
+addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeLb(); toggleTools(false); }
+  if (e.ctrlKey || e.metaKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k === 'j') step(1);
+  else if (k === 'k') step(-1);
+  else if (k === 'n') jumpStage('new');
+  else if (k === 'r') jumpStage('proc');
+  else if (k === 'f' && (activeTab === 'proc' || activeTab === 'nb')) { e.preventDefault(); document.querySelector(`#tab-${activeTab} .f-q`).focus(); }
+  else if (k === 'g') { e.preventDefault(); $('goto').focus(); }
+  else if (k === '1') tab('pages');
+  else if (k === '2') tab('proc');
+  else if (k === '3') tab('nb');
+  else if (k === '4') tab('search');
+  else if (k === '/') { e.preventDefault(); tab('search'); $('q').focus(); }
+  else if (k === '?') toggleTools();
+  else if (e.key === 'Home') { e.preventDefault(); scrollTo({top: 0}); }
+  else if (e.key === 'End') { e.preventDefault(); scrollTo({top: document.body.scrollHeight}); }
+});
+
+const dirtyCards = () => Object.values(cards).filter(c => c.dirty);
+addEventListener('beforeunload', e => { if (dirtyCards().length) { e.preventDefault(); e.returnValue = ''; } });
+
+function setAllImages(show) { Object.values(cards).forEach(c => c.setImg(show)); }
+
+function openLb(n) { $('lbimg').src = `/api/doc/${doc.id}/page/${n}/image?zoom=2.4`; $('lightbox').hidden = false; }
+function closeLb() { $('lightbox').hidden = true; $('lbimg').removeAttribute('src'); }
+
+async function refreshPage(n) {
+  doc.pages[n] = await api(`/api/doc/${doc.id}/page/${n}`);
+  if (cards[n]) { cards[n].reload(); }
+  else { cards[n] = makeCard(n); place(n); }
+}
+
+// ---------------------------------------------------------------- selection + bulk actions
+function updateSelBar() {
+  const n = selected.size;
+  $('selbar').hidden = n === 0;
+  if (!n || !doc) return;
+  let proc = 0, nb = 0, withText = 0;
+  selected.forEach(p => { const s = stageOf(p); if (s === 'proc') proc++; else if (s === 'nb') nb++; if (s !== 'new') withText++; });
+  $('selcount').textContent = `${n} page${n > 1 ? 's' : ''} selected`;
+  $('sb-tonb').hidden = !proc; $('sb-tonb').textContent = `Add ${proc} to notebook`;
+  $('sb-fromnb').hidden = !nb; $('sb-fromnb').textContent = `${nb} back to processed`;
+  $('sb-fix').hidden = !withText; $('sb-fix').textContent = `Fix text of ${withText}`;
+  $('sb-del').hidden = !withText; $('sb-del').textContent = `Delete text of ${withText}`;
+}
+function clearSel() { [...selected].forEach(n => cards[n] && cards[n].setSel(false)); selected.clear(); lastSel = null; updateSelBar(); }
+function selectAll(gid) { visibleCards(gid).forEach(c => cards[+c.dataset.page].setSel(true)); updateSelBar(); }
+
+async function bulk(action, pages) {
+  await Promise.all(pages.map(n => cards[n] && cards[n].flush ? cards[n].flush() : null));   // never lose unsaved edits
+  const r = await post(`/api/doc/${doc.id}/bulk`, {action, pages});
+  for (const [n, p] of Object.entries(r.pages)) { doc.pages[n] = p; if (cards[n]) cards[n].reload(); }
+  clearSel();
+  return r;
+}
+async function bulkMove(action) {
+  const want = action === 'to_nb' ? 'proc' : 'nb';
+  const pages = [...selected].filter(n => stageOf(n) === want);
+  if (!pages.length) return;
+  try { const k = Object.keys((await bulk(action, pages)).pages).length; toast(action === 'to_nb' ? `${k} pages added to the notebook` : `${k} pages moved back to processed`); }
+  catch (e) { toast(e.message, true); }
+}
+async function bulkDelete() {
+  const pages = [...selected].filter(n => stageOf(n) !== 'new');
+  if (!pages.length) return;
+  if (!confirm(`Delete the text of ${pages.length} page(s)? The PDF pages stay; they go back to the Pages tab.`)) return;
+  try { const k = Object.keys((await bulk('delete', pages)).pages).length; toast(`Deleted text of ${k} pages`); } catch (e) { toast(e.message, true); }
+}
+async function bulkFix() {
+  const pages = [...selected].filter(n => stageOf(n) !== 'new');
+  if (!pages.length) return;
+  try { toast(fixSummary((await bulk('clean', pages)).changes), true); } catch (e) { toast(e.message, true); }
+}
+async function fixAllShown(gid) {
+  const pages = visibleCards(gid).map(c => +c.dataset.page);
+  if (!pages.length) return toast('Nothing to fix');
+  try { toast(fixSummary((await bulk('clean', pages)).changes), true); } catch (e) { toast(e.message, true); }
+}
+async function bulkOcr() {
+  const pages = [...selected].sort((a, b) => a - b);
+  if (!pages.length) return;
+  if (pages.some(n => stageOf(n) !== 'new') && !confirm('Some selected pages already have text. Replace it with the new OCR result?')) return;
+  try {
+    const {job_id} = await post(`/api/doc/${doc.id}/process`,
+      {pages, engine: $('engine').value, formula: $('formula').checked, auto_nb: $('bnb').checked});
+    clearSel(); watchJob(job_id);
+  } catch (e) { toast(e.message, true); }
+}
+async function addAllShown() {
+  const pages = visibleCards('list-proc').map(c => +c.dataset.page);
+  if (!pages.length) return toast('Nothing to add');
+  if (!confirm(`Add ${pages.length} page(s) to the notebook?`)) return;
+  try { toast(`${Object.keys((await bulk('to_nb', pages)).pages).length} pages added to the notebook`); } catch (e) { toast(e.message, true); }
+}
+async function removeAllShown() {
+  const pages = visibleCards('list-nb').map(c => +c.dataset.page);
+  if (!pages.length) return toast('Nothing to move');
+  if (!confirm(`Move ${pages.length} page(s) back to Processed? Their text is kept.`)) return;
+  try { toast(`${Object.keys((await bulk('from_nb', pages)).pages).length} pages moved back to processed`); } catch (e) { toast(e.message, true); }
+}
+
+// ---------------------------------------------------------------- batch + job panel
+async function runBatch() {
+  if (!doc) return toast('Open a document first');
+  const a = Math.max(+$('bfrom').value || 1, 1), b = Math.min(+$('bto').value || doc.page_count, doc.page_count);
+  const pages = [];
+  for (let n = a; n <= b; n++) { if ($('bskip').checked && stageOf(n) !== 'new') continue; pages.push(n); }
+  if (!pages.length) return toast('Nothing to process in that range');
+  try {
+    const {job_id} = await post(`/api/doc/${doc.id}/process`,
+      {pages, engine: $('engine').value, formula: $('formula').checked, auto_nb: $('bnb').checked});
+    toggleTools(false);
+    watchJob(job_id);
+  } catch (e) { toast(e.message, true); }
+}
+
+async function watchJob(id) {
+  const row = document.createElement('div'); row.className = 'job'; $('jobs').appendChild(row);
+  const known = new Set();
+  let cancelled = false;
+  while (true) {
+    let j;
+    try { j = await api('/api/job/' + id); } catch (e) { row.textContent = 'job lost: ' + e.message; break; }
+    for (const n of Object.keys(j.results || {})) if (!known.has(n)) { known.add(n); await refreshPage(+n); }
+    const nerr = Object.keys(j.errors || {}).length;
+    row.className = 'job' + (j.status === 'done' ? ' ok' : (j.status === 'error' || j.status === 'cancelled') ? ' bad' : '');
+    row.innerHTML = `<div class="top"><b>${esc(j.engine)}</b><span>${j.done}/${j.total}${nerr ? ` (${nerr} failed)` : ''}</span>
+      <span class="progress"><i style="width:${Math.round(100 * (j.done + nerr) / Math.max(j.total, 1))}%"></i></span></div>
+      <span class="small msg">${esc(j.error || j.msg || j.status)}</span>`;
+    const btn = document.createElement('button');
+    if (j.status === 'running') {
+      btn.textContent = cancelled ? 'Cancelling...' : 'Cancel'; btn.disabled = cancelled;
+      btn.onclick = () => { cancelled = true; post(`/api/job/${id}/cancel`, {}); btn.textContent = 'Cancelling...'; btn.disabled = true; };
+      row.appendChild(btn);
+    } else {
+      btn.textContent = 'Dismiss'; btn.onclick = () => row.remove(); row.appendChild(btn);
+      if (nerr) toast(`${nerr} page(s) failed, e.g. page ${Object.keys(j.errors)[0]}: ${Object.values(j.errors)[0]}`, true);
+      else if (j.status === 'done') toast(`Finished: ${j.done} page(s) processed`, false, {label: 'Review', fn: () => tab('proc')});
+      break;
+    }
+    await sleep(2000);
+  }
+  setTimeout(() => row.remove(), 60000);
+}
+
+// ---------------------------------------------------------------- one page card
+function makeCard(n) {
+  const el = document.createElement('div');
+  el.className = 'card'; el.dataset.page = n;
+  el.innerHTML = `
+    <div class="head">
+      <input type="checkbox" class="sel-cb" title="Select this page (Shift-click to select a range)">
+      <b class="chip">Page ${n}</b> <span class="badge"></span> <span class="status"></span><span class="spacer"></span>
+      <select class="c-engine" data-show="new proc" title="Engine for THIS page (Default = the one in the top bar)"></select>
+      <button class="b-ocr" data-show="new proc" title="OCR this page with the engine chosen next to it">OCR page</button>
+      <button class="b-layer" data-show="new proc" title="Use text already embedded in the PDF, re-ordered by column">Text layer</button>
+      <button class="b-snip" data-show="new proc" title="Drag a rectangle on the page to OCR just that part">Snip: off</button>
+      <button class="b-cancel" hidden>Cancel</button>
+      <button class="b-img on" title="Show or hide the page image">Image</button>
+      <button class="b-del-head danger" data-show="nb" title="Delete this page's text (the page goes back to the Pages tab)">Delete</button>
+    </div>
+    <div class="body">
+      <div class="wrap" title="Click to enlarge"><img loading="lazy" alt="page ${n}" src="/api/doc/${doc.id}/page/${n}/image?zoom=1.3"></div>
+      <div class="side">
+        <div class="editor" hidden>
+          <div class="fmt">
+            <span class="seg">
+              <button data-f="h1" title="Heading 1 (click again to remove)"><b>H1</b></button>
+              <button data-f="h2" title="Heading 2"><b>H2</b></button>
+              <button data-f="h3" title="Heading 3"><b>H3</b></button>
+            </span>
+            <span class="seg">
+              <button data-f="ul" title="Bulleted list">&bull; List</button>
+              <button data-f="ol" title="Numbered list">1. List</button>
+            </span>
+            <span class="seg">
+              <button data-f="b" title="Bold (Ctrl+B)"><b>B</b></button>
+              <button data-f="i" title="Italic (Ctrl+I)"><i>I</i></button>
+            </span>
+            <button data-f="clear" title="Remove heading / list marks from the selected lines">Plain</button>
+            <span class="spacer"></span>
+            <button class="b-prev" title="See how headings and lists will look">Preview</button>
+          </div>
+          <div class="lfind">
+            <input type="search" class="lf-q" placeholder="Find in this page (Ctrl+F)">
+            <button class="iconbtn lf-prev" title="Previous match (Shift+Enter)">&#9650;</button>
+            <button class="iconbtn lf-next" title="Next match (Enter)">&#9660;</button>
+            <span class="small lf-count"></span>
+          </div>
+          <div class="tawrap"><div class="hl" aria-hidden="true"></div>
+            <textarea spellcheck="false" placeholder="Page text"></textarea></div>
+          <div class="preview md" hidden></div>
+          <div class="actions">
+            <button class="b-save" title="Ctrl+S">Save</button>
+            <button class="b-tonb" data-show="proc" title="Ctrl+Enter">Add to notebook</button>
+            <button class="b-fromnb" data-show="nb">Back to processed</button>
+            <button class="b-fix" title="Converts $math$ to plain symbols, joins hyphenated line breaks, tidies spaces and bullets">Fix text / math</button>
+            <button class="b-discard danger" data-show="proc nb">Delete text</button>
+            <span class="spacer"></span>
+            <span class="small count"></span>
+            <span class="dirty"></span>
+          </div>
+        </div>
+        <button class="b-manual" data-show="new">Add text manually</button>
+      </div>
+    </div>`;
+
+  const q = s => el.querySelector(s);
+  const ta = q('textarea'), hl = q('.hl'), tawrap = q('.tawrap'), preview = q('.preview'), fmt = q('.fmt'),
+        wrap = q('.wrap'), status = q('.status'), body = q('.body'), editor = q('.editor'),
+        dirtyEl = q('.dirty'), badge = q('.badge'), cnt = q('.count'), cb = q('.sel-cb'), imgBtn = q('.b-img'),
+        prevBtn = q('.b-prev');
+  const c = {el, manual: false, dirty: false, working: false, stage: undefined};
+  let snip = false, start = null, box = null, curJob = null, curRe = null, curIdx = -1;
+  ta.value = (doc.pages[n] || {}).text || '';
+  c.text = () => ta.value;
+
+  const updCount = () => { const t = ta.value.trim(); cnt.textContent = t ? `${t.split(/\s+/).length} words` : ''; };
+  updCount();
+
+  // ---- highlight layer + preview. Two sources: the tab-wide find bar (global) and this card's own find box (local).
+  let globalRe = null, globalIdx = -1, localRe = null, localIdx = -1;
+  const lfq = q('.lf-q'), lfc = q('.lf-count');
+  const sync = () => { curRe = localRe || globalRe; curIdx = localRe ? localIdx : globalIdx; };
+  const refreshPreview = () => { if (!preview.hidden) preview.innerHTML = renderMd(ta.value, curRe); };
+
+  function renderHl() {
+    if (!curRe) { hl.innerHTML = ''; return; }
+    const t = ta.value; let out = '', last = 0, k = 0;
+    for (const m of t.matchAll(curRe)) {
+      out += esc(t.slice(last, m.index)) + `<mark${k === curIdx ? ' class="cur"' : ''}>` + esc(m[0]) + '</mark>';
+      last = m.index + m[0].length; k++;
+    }
+    hl.innerHTML = out + esc(t.slice(last)) + ' ';
+    hl.scrollTop = ta.scrollTop;
+  }
+  const scrollToCur = () => {
+    if (!preview.hidden) { const ms = preview.querySelectorAll('mark'); if (ms[curIdx]) ms[curIdx].scrollIntoView({block: 'center'}); return; }
+    const m = hl.querySelector('mark.cur');
+    if (m) ta.scrollTop = hl.scrollTop = Math.max(m.offsetTop - ta.clientHeight / 3, 0);
+  };
+  c.setFind = (re, idx, scroll) => {
+    globalRe = re; globalIdx = idx; sync(); renderHl(); refreshPreview();
+    if (scroll) scrollToCur();
+  };
+  ta.addEventListener('scroll', () => { hl.scrollTop = ta.scrollTop; });
+
+  // ---- this card's own find box
+  function localRun() {
+    localRe = buildRe(lfq.value); localIdx = -1; sync(); renderHl(); refreshPreview();
+    if (!localRe) { lfc.textContent = ''; return; }
+    const total = countIn(ta.value, localRe);
+    lfc.textContent = total ? `${total} match${total > 1 ? 'es' : ''}` : 'No match';
+    if (total) localStep(1);
+  }
+  function localStep(dir) {
+    if (!localRe) return;
+    const total = countIn(ta.value, localRe);
+    if (!total) { lfc.textContent = 'No match'; return; }
+    localIdx = localIdx < 0 ? (dir > 0 ? 0 : total - 1) : (localIdx + dir + total) % total;
+    sync(); renderHl(); refreshPreview(); scrollToCur();
+    lfc.textContent = `${localIdx + 1} / ${total}`;
+  }
+  let lft;
+  lfq.addEventListener('input', () => { clearTimeout(lft); lft = setTimeout(localRun, 120); });
+  lfq.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); clearTimeout(lft); (localRe && buildRe(lfq.value) + '' === localRe + '') ? localStep(e.shiftKey ? -1 : 1) : localRun(); }
+    else if (e.key === 'Escape') { lfq.value = ''; localRun(); lfq.blur(); }
+  });
+  q('.lf-next').onclick = () => localStep(1);
+  q('.lf-prev').onclick = () => localStep(-1);
+
+  prevBtn.onclick = () => {
+    const on = preview.hidden;
+    preview.hidden = !on; tawrap.hidden = on; fmt.classList.toggle('previewing', on);
+    prevBtn.classList.toggle('on', on); prevBtn.textContent = on ? 'Edit' : 'Preview';
+    if (on) preview.innerHTML = renderMd(ta.value, curRe);
+  };
+  fmt.addEventListener('mousedown', e => e.preventDefault());                 // keep the selection in the text box
+  fmt.addEventListener('click', e => {
+    const b = e.target.closest('button[data-f]');
+    if (b) applyFmt(ta, b.dataset.f);
+  });
+
+  const engSel = q('.c-engine');
+  c.fillEngines = () => {
+    const keep = engSel.value;
+    engSel.innerHTML = '<option value="">Default</option>' +
+      ENGINES.filter(e => e.available).map(e => `<option value="${e.id}">${esc(e.label)}</option>`).join('');
+    engSel.value = keep;
+  };
+  c.fillEngines();
+
+  const showBadge = () => {
+    const p = doc.pages[n] || {};
+    badge.textContent = p.engine ? `${p.engine}, quality ${p.quality}` : '';
+    badge.classList.toggle('low', p.quality !== undefined && p.quality < 0.8);
+  };
+  showBadge();
+
+  const setImg = show => {
+    wrap.hidden = !show; imgBtn.classList.toggle('on', show); body.classList.toggle('single', !show);
+    if (!show) setSnip(false);
+  };
+  c.setImg = setImg;
+  imgBtn.onclick = () => setImg(wrap.hidden);
+
+  c.apply = () => {
+    const st = stageOf(n), prev = c.stage;
+    el.dataset.stage = st;
+    el.querySelectorAll('[data-show]').forEach(x => x.hidden = !x.dataset.show.split(' ').includes(st));
+    editor.hidden = st === 'new' && !c.manual;
+    if (st !== prev) {
+      if (st === 'nb') setImg(false);
+      else if (prev === 'nb' || prev === undefined) setImg(true);
+    }
+    c.stage = st;
+  };
+
+  c.setSel = on => { cb.checked = on; el.classList.toggle('picked', on); on ? selected.add(n) : selected.delete(n); };
+  cb.onclick = e => {
+    const on = cb.checked;
+    if (e.shiftKey && lastSel && lastSel !== n && cards[lastSel] && cards[lastSel].el.parentElement === el.parentElement) {
+      const list = [...el.parentElement.children].filter(x => !x.hidden);
+      const a = list.indexOf(cards[lastSel].el), b = list.indexOf(el);
+      list.slice(Math.min(a, b), Math.max(a, b) + 1).forEach(x => cards[+x.dataset.page].setSel(on));
+    } else c.setSel(on);
+    lastSel = n; updateSelBar();
+  };
+
+  c.reload = () => {
+    ta.value = (doc.pages[n] || {}).text || '';
+    c.dirty = false; dirtyEl.textContent = ''; status.textContent = ''; updCount();
+    showBadge(); place(n); updateSelBar();
+    renderHl(); if (!preview.hidden) preview.innerHTML = renderMd(ta.value, curRe);
+  };
+  const setPage = p => { doc.pages[n] = p; c.dirty = false; dirtyEl.textContent = ''; showBadge(); updCount(); };
+
+  async function save(extra) {
+    setPage(await post(`/api/doc/${doc.id}/page/${n}/text`, {text: ta.value, ...extra}));
+  }
+  c.flush = async () => { if (c.dirty && stageOf(n) !== 'new' && ta.value.trim()) await save({}); };
+  async function act(btn, label, fn) {
+    const old = btn.textContent; btn.disabled = true; btn.textContent = label;
+    try { await fn(); } catch (e) { toast(`Page ${n}: ${e.message}`, true); }
+    btn.disabled = false; btn.textContent = old;
+  }
+  const moved = msg => {
+    const from = el.parentElement;
+    let nextEl = null;
+    if (S.advance) { nextEl = el.nextElementSibling; while (nextEl && nextEl.hidden) nextEl = nextEl.nextElementSibling; }
+    place(n);
+    const t = STAGE_TAB[stageOf(n)];
+    const left = t !== activeTab;
+    toast(msg, false, left ? {label: 'Show in ' + TAB_LABEL[t], fn: () => goPage(n)} : null);
+    if (left && nextEl && from.id === GRID[activeTab]) { cur = +nextEl.dataset.page; flash(nextEl); updateCur(); }
+  };
+
+  ta.oninput = () => {
+    c.dirty = true; dirtyEl.textContent = 'unsaved changes'; updCount(); renderHl();
+  };
+  ta.onblur = async () => {                      // quiet autosave for pages that are already processed
+    if (!c.dirty || stageOf(n) === 'new' || !ta.value.trim()) return;
+    try { await save({}); status.textContent = 'saved'; setTimeout(() => { if (status.textContent === 'saved') status.textContent = ''; }, 1500); } catch (e) {}
+  };
+  ta.addEventListener('keydown', e => {
+    const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+    if (mod && k === 's') { e.preventDefault(); q('.b-save').click(); }
+    else if (mod && e.key === 'Enter') { e.preventDefault(); (stageOf(n) === 'proc' ? q('.b-tonb') : q('.b-save')).click(); }
+    else if (mod && k === 'b') { e.preventDefault(); applyFmt(ta, 'b'); }
+    else if (mod && k === 'i') { e.preventDefault(); applyFmt(ta, 'i'); }
+    else if (mod && k === 'f') { e.preventDefault(); lfq.focus(); lfq.select(); }
+    else if (e.key === 'Escape') ta.blur();
+  });
+  q('.b-manual').onclick = () => { c.manual = true; c.apply(); ta.focus(); };
+
+  q('.b-save').onclick = e => act(e.currentTarget, 'Saving...', async () => {
+    await save({}); status.textContent = 'saved';
+    moved(stageOf(n) === 'new' ? `Page ${n} is empty, back in Pages` : `Page ${n} saved`);
+  });
+  q('.b-tonb').onclick = e => act(e.currentTarget, 'Adding...', async () => {
+    if (!ta.value.trim()) throw new Error('text is empty');
+    await save({in_notebook: true});
+    moved(`Page ${n} added to the notebook`);
+  });
+  q('.b-fromnb').onclick = e => act(e.currentTarget, 'Moving...', async () => {
+    await save({in_notebook: false});
+    moved(`Page ${n} moved back to processed`);
+  });
+  const del = e => act(e.currentTarget, 'Deleting...', async () => {
+    if (!confirm(`Delete the text of page ${n}? The page goes back to the Pages tab.`)) return;
+    ta.value = ''; await save({text: '', in_notebook: false});
+    c.manual = false; status.textContent = ''; renderHl();
+    moved(`Text of page ${n} deleted`);
+  });
+  q('.b-discard').onclick = del; q('.b-del-head').onclick = del;
+  q('.b-fix').onclick = e => act(e.currentTarget, 'Fixing...', async () => {
+    const r = await post('/api/clean', {text: ta.value});
+    if (r.text !== ta.value) replaceRange(ta, 0, ta.value.length, r.text);   // keeps undo (Ctrl+Z) working
+    if (!preview.hidden) preview.innerHTML = renderMd(ta.value, curRe);
+    toast(fixSummary(r.changes), true);
+  });
+
+  // ---- OCR (whole page or snipped box) through the job system
+  const workBtns = ['.b-ocr', '.b-layer', '.b-snip'];
+  async function runOcr(box) {
+    if (c.working) return;
+    c.working = true;
+    workBtns.forEach(s => q(s).disabled = true); q('.b-cancel').hidden = false;
+    try {
+      if (box && c.dirty) await save({});
+      const {job_id} = await post(`/api/doc/${doc.id}/process`,
+        {pages: [n], box, engine: engSel.value || $('engine').value, formula: $('formula').checked});
+      curJob = job_id;
+      const t0 = Date.now();
+      while (true) {
+        await sleep(1500);
+        const j = await api('/api/job/' + job_id);
+        status.textContent = `${j.msg || 'processing'} (${Math.round((Date.now() - t0) / 1000)}s)`;
+        if (j.status === 'done') { await refreshPage(n); toast(`Page ${n} done`, false, {label: 'Review', fn: () => goPage(n)}); break; }
+        if (j.status === 'error') throw new Error(j.error);
+        if (j.status === 'cancelled') throw new Error('cancelled');
+      }
+    } catch (e) { status.textContent = 'failed'; toast(`Page ${n}: ${e.message}`, true); }
+    c.working = false; curJob = null;
+    workBtns.forEach(s => q(s).disabled = false); q('.b-cancel').hidden = true;
+  }
+  q('.b-cancel').onclick = () => { if (curJob) post(`/api/job/${curJob}/cancel`, {}); };
+  q('.b-ocr').onclick = () => {
+    if (ta.value.trim() && !confirm('Replace the existing text of this page with a new OCR result?')) return;
+    runOcr(null);
+  };
+  q('.b-layer').onclick = e => {
+    if (ta.value.trim() && !confirm('Replace the existing text of this page?')) return;
+    act(e.currentTarget, 'Reading...', async () => {
+      setPage(await post(`/api/doc/${doc.id}/page/${n}/layer`, {}));
+      ta.value = doc.pages[n].text; updCount();
+      moved(`Page ${n}: text layer extracted`);
+    });
+  };
+
+  // ---- snipping: drag a rectangle on the page image
+  function setSnip(on) {
+    snip = on; wrap.classList.toggle('snip', on);
+    const b = q('.b-snip'); b.textContent = on ? 'Snip: ON (drag on page)' : 'Snip: off'; b.classList.toggle('on', on);
+  }
+  q('.b-snip').onclick = () => { if (wrap.hidden) setImg(true); setSnip(!snip); };
+  wrap.addEventListener('click', ev => { if (!snip && ev.target.tagName === 'IMG') openLb(n); });
+  const pos = ev => {
+    const r = wrap.getBoundingClientRect();
+    return [Math.min(Math.max((ev.clientX - r.left) / r.width, 0), 1),
+            Math.min(Math.max((ev.clientY - r.top) / r.height, 0), 1)];
+  };
+  wrap.addEventListener('pointerdown', ev => {
+    if (!snip || c.working) return;
+    ev.preventDefault(); wrap.setPointerCapture(ev.pointerId);
+    start = pos(ev);
+    if (box) box.remove();
+    box = document.createElement('div'); box.className = 'sel'; wrap.appendChild(box);
+  });
+  wrap.addEventListener('pointermove', ev => {
+    if (!snip || !start) return;
+    const [x, y] = pos(ev);
+    box.style.left = Math.min(x, start[0]) * 100 + '%'; box.style.top = Math.min(y, start[1]) * 100 + '%';
+    box.style.width = Math.abs(x - start[0]) * 100 + '%'; box.style.height = Math.abs(y - start[1]) * 100 + '%';
+  });
+  wrap.addEventListener('pointerup', ev => {
+    if (!snip || !start) return;
+    const [x, y] = pos(ev);
+    const b = [Math.min(x, start[0]), Math.min(y, start[1]), Math.max(x, start[0]), Math.max(y, start[1])];
+    start = null;
+    if (b[2] - b[0] < 0.01 || b[3] - b[1] < 0.01) { box.remove(); return; }
+    runOcr(b).then(() => { if (box) box.remove(); });
+  });
+
+  return c;
+}
+
+// ---------------------------------------------------------------- notebook helpers
+async function exportNb(which) {
+  if (!doc) return toast('Open a document first');
+  await Promise.all(Object.values(cards).map(c => c.flush && c.flush()));
+  let nb = 0; for (const n in doc.pages) if (stageOf(+n) === 'nb') nb++;
+  if (!nb) return toast('The notebook is empty');
+  if (nb < doc.page_count && !confirm(`Only ${nb} of ${doc.page_count} pages are in the notebook. Download anyway?`)) return;
+  const nm = prompt('Name this document (it is saved inside the JSON and TXT files):',
+                    doc.title || doc.name.replace(/\.pdf$/i, ''));
+  if (nm === null) return;
+  try {
+    doc.title = (await post(`/api/doc/${doc.id}/meta`, {title: nm})).title;
+    const safe = doc.title.replace(/[\\/:*?"<>|]+/g, '_');
+    for (const fmt of which === 'both' ? ['json', 'txt'] : [$('expfmt').value]) {
+      const r = await fetch(`/api/doc/${doc.id}/export?format=${fmt}&pages=${$('exppages').checked ? 1 : 0}&columns=${$('expcols').checked ? 1 : 0}`);
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(await r.blob()); a.download = safe + '.' + fmt;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      await sleep(400);
+    }
+    refreshDocs(); toast(`Saved as "${doc.title}"`);
+  } catch (e) { toast(e.message, true); }
+}
+
+async function copyAll() {
+  if (!doc) return;
+  const items = await api(`/api/doc/${doc.id}/notebook`);
+  if (!items.length) return toast('Notebook is empty');
+  await navigator.clipboard.writeText(items.map(i => `--- page ${i.page} ---\n${i.text}`).join('\n\n'));
+  toast(`Copied ${items.length} pages`);
+}
+
+// ---------------------------------------------------------------- search tab (results keep headings / lists / bold)
+function searchRe(q) {
+  const words = q.toLowerCase().split(/\W+/).filter(w => w.length > 2);
+  const x = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const parts = [q.trim().split(/\s+/).map(x).join('\\s+'), ...words.map(x)].filter(Boolean);
+  return parts.length ? new RegExp(parts.join('|'), 'gi') : null;
+}
+
+async function doSearch() {
+  if (!doc) return toast('Open a document first');
+  const q = $('q').value.trim(); if (!q) return;
+  const b = $('sbtn'); b.disabled = true; b.textContent = 'Searching...';
+  $('hits').textContent = '';
+  try {
+    await Promise.all(Object.values(cards).map(c => c.flush && c.flush()));
+    const hits = await api(`/api/doc/${doc.id}/search?related=${$('rel').checked ? 1 : 0}&q=` + encodeURIComponent(q));
+    if (!hits.length) $('hits').innerHTML = '<p class="empty">No match in the notebook. Tick "include related (meaning-based) results" to also search by meaning.</p>';
+    else if (hits[0].sem === false) $('hits').innerHTML = '<p class="small">Meaning-based search is unavailable (embedding model could not load), so this is keyword-only.</p>';
+    const re = searchRe(q);
+    hits.forEach(h => {
+      const d = document.createElement('div'); d.className = 'hit';
+      const meta = document.createElement('div'); meta.className = 'meta';
+      const t = document.createElement('span');
+      t.textContent = `page ${h.page} - score ${h.score} - keyword match ${Math.round(h.keywords * 100)}%`;
+      const go = document.createElement('button'); go.textContent = 'Open page'; go.onclick = () => goPage(h.page);
+      meta.append(t, go);
+      const body = document.createElement('div'); body.className = 'md';
+      let html = '';
+      if (h.heading) {
+        const lv = Math.min(Math.max(h.level || 2, 1), 4);
+        html += h.start ? `<h${lv}>${mdInline(h.heading, re)}</h${lv}>` : `<div class="crumb">${mdInline(h.heading, null)}</div>`;
+      }
+      body.innerHTML = html + renderMd(h.text, re);
+      d.append(meta, body); $('hits').appendChild(d);
+    });
+  } catch (e) { $('hits').textContent = 'Search failed: ' + e.message; }
+  b.disabled = false; b.textContent = 'Search';
+}
+
+// ---------------------------------------------------------------- start
+applyTheme();
+applyView();
+tab('pages');
+tab('pages');
+(async () => {
+  await loadEngines();
+  const list = await refreshDocs();
+  const last = LS.get('lastDoc', null);
+  if (last && list.some(d => d.id === last)) openDoc(last);
+})();
+</script>
+</body>
+</html>

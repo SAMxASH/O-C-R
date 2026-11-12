@@ -1,0 +1,12 @@
+flask
+python-dotenv
+pymupdf
+numpy
+requests
+pillow
+sentence-transformers
+# --- local OCR engines: install at least one (all optional) ---
+pytesseract            # also install the Tesseract program itself (Windows: UB-Mannheim build)
+rapidocr-onnxruntime   # fastest on CPU, no GPU needed
+# paddleocr paddlepaddle   # heavier; best with a GPU
+python-docx            # Word (.docx) export
